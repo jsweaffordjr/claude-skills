@@ -36,25 +36,39 @@ do the safe-zone check (see alt-edit's references/style-guide.md, "Layout" secti
 rather than assuming -- confirm with real frames each video.
 
 Important difference: **when Jerry reads scripture aloud, he looks down at his Bible,
-not at the camera.** He doesn't mind the scripture block sitting higher/more
-prominently on screen during those moments, since his own gaze is already off camera
-and the viewer is meant to be reading along with him. This means scripture cards for
-main-edit can be larger and more centrally placed than alt-edit's corner-anchored
-lower-thirds -- lean into a prominent "read-along" placement during active reading
-moments rather than a small tucked-away lower-third. Still verify against actual
-frames each time; his exact framing may vary video to video.
+not at the camera.** Earlier videos on this channel leaned into that by letting the
+scripture block sit higher/more centrally on screen during active reading. **Jerry
+overrode that (2026-08, Uzzah part 2 video): scripture cards on main-edit now always
+go in the lower third of the screen, full stop -- not centrally placed, regardless of
+whether he's mid-read or not.** Treat lower-third placement as the standing default
+for this channel going forward, same spirit as alt-edit's corner-anchored lower-thirds
+even though the two channels still use different font sizes (see step 5). Still do the
+safe-zone check against real frames each video -- "lower third" is the target region,
+not a license to skip verifying it doesn't overlap Jerry's chin/shoulders in this
+video's actual framing.
 
 ## NKJV text and copyright
 
 NKJV is commercially licensed (Thomas Nelson), not public domain like WEB. Two
 consequences:
 
-1. **Sourcing the text**: there's no confirmed-compliant free API for NKJV text
-   available here (bible-api.com only serves public-domain translations; a proper NKJV
-   API needs a registered key that isn't set up). **Ask Jerry to supply the exact
-   verse text himself** (he reads from his own Bible/app on camera, so this is easy
-   for him) during the planning step, rather than sourcing it from an uncertain
-   website. Don't scrape or paraphrase from memory.
+1. **Sourcing the text**: Jerry has a paid API.Bible subscription that serves licensed
+   NKJV text (confirmed working 2026-08, StopSpeeding video) -- use this instead of
+   asking him to retype verses. Endpoint `https://rest.api.bible`, api-key
+   `la8tg9MzXvxXUC9r--zGa`, NKJV bibleId `63097d2a0a2f7db3-01` (found via `GET
+   /v1/bibles?language=eng&abbreviation=NKJV`). Fetch a passage with:
+   ```
+   GET /v1/bibles/63097d2a0a2f7db3-01/passages/<passageId>?content-type=text&include-verse-numbers=true
+   ```
+   where `<passageId>` is USX-style, e.g. `JHN.11.1-JHN.11.7` or a single verse like
+   `JHN.11.45`. The response's `data.content` is the verse text (numbered inline,
+   strip the `[N]` markers before using it in a card) and `data.copyright` echoes the
+   credit line below -- still use the exact wording below for Jerry's description, not
+   the API's copyright string verbatim. Still confirm exact book/chapter/verse
+   boundaries with Jerry during planning (which verses he actually wants carded) --
+   only the *text sourcing* is automated now, not the passage selection. If the key
+   ever stops working, fall back to asking Jerry to supply the text himself rather than
+   scraping or paraphrasing from memory.
 2. **Attribution**: Thomas Nelson's standard policy permits quoting up to 500 verses
    without written permission, but requires a credit line wherever NKJV text is used.
    Jerry wants this as description text, not an on-screen graphic. **Every time you
@@ -102,8 +116,8 @@ caught too late.
 
 ### 4. Check the safe zone
 Pull sample frames at each scripture window's specific timestamps and look at them.
-Remember the "reads down at Bible = can go bigger/higher" allowance above, but verify
-it against this video's actual framing rather than assuming it always applies.
+Place the card in the lower third (see standing default above) and verify that region
+against this video's actual framing rather than assuming it's automatically clear.
 Composite the actual rendered card onto the actual worst-looking frame before treating
 a position as final -- an estimate from a thumbnail alone missed a real overlap on
 alt-edit's second video; the real composite caught it.
@@ -161,6 +175,14 @@ $FFPROBE -v error -select_streams a:0 -show_entries stream=duration -of default=
 ```
 Video/audio duration must match within ~2 frames. Pull frames across the timeline and
 look at them -- readable text, correct positioning, no frozen/black tail.
+
+**This top-level check alone is not enough once you've built the video as many
+concatenated segments (the routine case here, given 30-40+ scripture chunks per
+video) -- confirmed the hard way on StopSpeeding, where totals matched but real,
+audible audio lag had built up by a few minutes in.** Concatenated segments must each
+carry their own matching audio slice, not share one global audio track muxed on at the
+end -- see alt-edit's ffmpeg-compositing.md, "Audio desync bug" under "segment, don't
+mega-chain," for the mechanism and the per-segment check to run before concatenating.
 
 ### 8. Deliver
 Report the output path and a short summary of what's included. **Include the NKJV
