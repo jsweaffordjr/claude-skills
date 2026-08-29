@@ -41,6 +41,15 @@ Video and audio duration should match within ~2 frames (~0.07s). If they don't, 
 ship it -- go back and check the filter graph / flags above rather than guessing at
 another workaround.
 
+**This total-duration check is necessary but NOT sufficient for a segmented build --
+confirmed the hard way on main-edit's StopSpeeding video.** Matching totals only prove
+the very end lines up; they say nothing about whether video and audio drifted apart
+and back together somewhere in the middle, which is exactly what happened: real,
+audible lag appeared a few minutes in even though the final numbers looked clean. See
+"segment, don't mega-chain" below for the actual mechanism and fix -- if you built the
+output as many concatenated segments, do the per-segment check described there, not
+just this top-level one.
+
 ## The filter_complex template
 
 One ffmpeg invocation does everything: scale to 4K, then chain one `overlay` stage per
@@ -158,6 +167,40 @@ does not meaningfully cost more wall-clock time than a single mega-pass *would* 
 taken if it worked -- it just avoids the crash. Verify every segment's actual duration
 against its intended duration with `ffprobe` before concatenating (see the next
 section for why this check matters).
+
+**Audio desync bug, confirmed the hard way on main-edit's StopSpeeding video: give
+each segment its own audio, don't pair the concatenated video against one global
+audio track.** Each segment's video is independently re-encoded, and output-side `-t`
+duration always rounds UP to the nearest whole frame (never down) when it doesn't land
+exactly on a frame boundary. That per-segment rounding is individually tiny (a
+fraction of a frame) and harmless -- but if all N segments are video-only and get
+concatenated, then muxed as a group against ONE continuous audio track pulled straight
+from the source, those small one-directional roundings add together across every
+segment boundary. The drift grows roughly linearly through the video: small and
+inaudible for the first segment or two, then increasingly noticeable. On StopSpeeding
+this was audible within the first few minutes despite the *total* video duration
+matching the *total* audio duration closely at the very end -- `-shortest` on the final
+mux only trims the tail, it does nothing to fix drift that already accumulated in the
+middle, and the top-level duration check above cannot detect it because it only looks
+at final totals.
+
+The fix: never carry one global audio track through a multi-segment build. Instead,
+for each segment, extract a matching audio slice from the source using the *same*
+`-ss`/`-t` window used for that segment's video, then mux that segment's own video
+with its own audio slice (`-c:v copy -c:a copy -shortest`) *before* concatenating.
+`-shortest` on this small per-segment mux only ever trims a sub-frame sliver local to
+that one segment -- video and audio drift together, imperceptibly, rather than the
+video drifting away from an unrelated continuous audio track. Concatenate the
+resulting audio+video segments together as the final step (concat demuxer, `-c copy`
+for both streams); do not re-introduce a separate global audio mux afterward. Verify
+per segment before concatenating, not just on the final file:
+```
+ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 segment.mp4
+```
+Container-level `format=duration` is the trustworthy number here -- per-stream
+`duration` metadata on a `-shortest`-trimmed track can still report a stale, untrimmed
+value even after the container was correctly truncated, which reads as a false
+mismatch if you compare stream-level durations instead.
 
 **`-t` placement bug, confirmed the hard way:** input options like `-ss` and `-t` bind
 to whichever `-i` comes *next* in the argument list, not the one before them. Writing
