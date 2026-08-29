@@ -31,9 +31,7 @@ during planning rather than assuming.
 ## Footage style: different from alt-edit
 
 Jerry is **seated, looking directly into the camera** -- not walking/handheld. This is
-much more stable and predictable framing than alt-edit's roaming close-up, but still
-do the safe-zone check (see alt-edit's references/style-guide.md, "Layout" section)
-rather than assuming -- confirm with real frames each video.
+much more stable and predictable framing than alt-edit's roaming close-up.
 
 Important difference: **when Jerry reads scripture aloud, he looks down at his Bible,
 not at the camera.** Earlier videos on this channel leaned into that by letting the
@@ -42,10 +40,15 @@ overrode that (2026-08, Uzzah part 2 video): scripture cards on main-edit now al
 go in the lower third of the screen, full stop -- not centrally placed, regardless of
 whether he's mid-read or not.** Treat lower-third placement as the standing default
 for this channel going forward, same spirit as alt-edit's corner-anchored lower-thirds
-even though the two channels still use different font sizes (see step 5). Still do the
-safe-zone check against real frames each video -- "lower third" is the target region,
-not a license to skip verifying it doesn't overlap Jerry's chin/shoulders in this
-video's actual framing.
+even though the two channels still use different font sizes (see step 5).
+
+**Do not check scripture-card placement against Jerry's face/chest for overlap
+(confirmed 2026-08, IAmTheVine video).** On this channel's seated, close framing his
+torso fills most of the lower frame in essentially every shot, so a lower-third card
+overlapping his face/chest is expected and accepted -- not a defect to catch or flag.
+Skip the composite-onto-worst-frame safe-zone check that alt-edit's style-guide
+describes; it does not apply to main-edit. (Frame-edge clipping and text legibility
+still matter -- just not overlap with Jerry himself.)
 
 ## NKJV text and copyright
 
@@ -115,20 +118,19 @@ alt-edit: a 20-30 minute encode is expensive to redo over a wrong timestamp or a
 caught too late.
 
 ### 4. Check the safe zone
-Pull sample frames at each scripture window's specific timestamps and look at them.
-Place the card in the lower third (see standing default above) and verify that region
-against this video's actual framing rather than assuming it's automatically clear.
-Composite the actual rendered card onto the actual worst-looking frame before treating
-a position as final -- an estimate from a thumbnail alone missed a real overlap on
-alt-edit's second video; the real composite caught it.
+Overlap with Jerry's face/chest is not a concern on this channel -- see "Footage
+style" above, don't check for it. Still pull a sample frame or two and composite the
+actual rendered card onto one before calling a video done, but only to catch things
+that *are* still defects: text clipping off the left/right frame edge, a card tall
+enough to run past the top or bottom edge, or illegible text -- not speaker overlap.
 
 ### 5. Build the graphics
 
 **main-edit's font size is NOT the same as alt-edit's, and does not inherit alt-edit's
-default.** Always pass explicit overrides:
+default.** Always pass explicit overrides (and see the 3-line cap below for why
+`scripture-auto` is the command to reach for, not the manual `scripture` one):
 ```
-python3 ~/.claude/skills/alt-edit/scripts/gen_overlay.py scripture "<ref> (NKJV)" "<text>" <out.png> --label-size 138 --body-size 126
-python3 ~/.claude/skills/alt-edit/scripts/gen_overlay.py scripture-auto "<ref> (NKJV)" "<full text>" <out_prefix> --label-size 138 --body-size 126
+python3 ~/.claude/skills/alt-edit/scripts/gen_overlay.py scripture-auto "<ref> (NKJV)" "<full text>" <out_prefix> --label-size 138 --body-size 126 --max-height 770
 ```
 138/126 is main-edit's standing default -- confirmed correct *in true proportion on
 this channel's actual seated footage* (AIdolatry video, 2026-08). Do not omit
@@ -147,13 +149,19 @@ to compare sizes, the same way you'd verify position. A size judged "too small" 
 large" from a cropped preview is not a reliable verdict.
 
 Scripture-only for this channel -- no badge/motion-graphic generation needed unless
-step 3 turned up an exception. Given "a lot more scripture" and the read-along
-philosophy above, split text by whatever renders at a reasonable height rather than by
-verse boundaries (see alt-edit's style-guide.md, "Scripture chunking") -- use
-`scripture-auto` for anything longer than a short phrase, and
+step 3 turned up an exception.
+
+**Cards are capped at 3 lines of body text, not counting the reference line
+(confirmed 2026-08, IAmTheVine video).** This is a hard cap, not a rough target --
+always use `scripture-auto`, even for passages that look short enough to fit as one
+manual `scripture` card, so the tool's own line-fitting enforces it rather than eyeballing
+it. Pass `--max-height 770` alongside the standing `--label-size 138 --body-size 126`:
+that value is exactly 3 body lines at this font size (1 line = 446px, 2 = 608px, 3 =
+770px, 4 = 932px -- derived from `label_h + n*line_h + bottom_pad` in gen_overlay.py,
+re-derive it the same way if the standing font sizes ever change). Use
 `~/.claude/skills/alt-edit/scripts/build_scripture_slideshow.py` to pack a passage's
-chunks into one timed video rather than one overlay stage per chunk (essential once a
-video has many passages -- see alt-edit's ffmpeg-compositing.md).
+resulting chunks into one timed video rather than one overlay stage per chunk
+(essential once a video has many passages -- see alt-edit's ffmpeg-compositing.md).
 
 **Timing each chunk's on-screen start/end**: derive these from word-level transcript
 timestamps, not line-level guessing or a reading-speed floor -- see alt-edit's
