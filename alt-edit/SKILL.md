@@ -43,6 +43,12 @@ python3 scripts/transcribe.py raw-audio.m4a transcript.txt
 Runs locally on CPU (~1-2 minutes for a 10-20 minute video), no data leaves the
 machine. Produces `[hh:mm:ss] text` lines.
 
+**Write `transcript.txt` into the same folder as the raw source video, not a scratch/
+working directory (confirmed with Jerry, 2026-08).** Unlike the other intermediates
+(audio extract, PNG/mov assets), the transcript is a keeper on this channel going
+forward -- don't lump it in with step 8's "clean up intermediates?" question, and
+don't delete it during cleanup even if Jerry says yes to the rest.
+
 **Show Jerry the transcript and ask him to flag any mis-transcribed names/terms**
 before treating it as ground truth -- Whisper garbled a book title and an author's
 name in the first video ("Biblio Diet", "Jordan Reuben" instead of the real names).
@@ -112,8 +118,9 @@ them -- confirm correct positioning, readable text, no overlap, no frozen/black 
 ### 8. Deliver
 Report the output path, a short summary of what's included and when, and ask Jerry
 about the output filename and whether to clean up intermediate files (audio extract,
-transcript, PNG/mov assets) -- don't delete anything he might want without asking,
-same as last time.
+PNG/mov assets) -- don't delete anything he might want without asking, same as last
+time. **The transcript is excluded from that cleanup question** -- it already lives
+in the raw video's folder per step 2 and stays there.
 
 ## Reference files
 - `references/ffmpeg-compositing.md` -- the compositing recipe, the VFR sync bug and
