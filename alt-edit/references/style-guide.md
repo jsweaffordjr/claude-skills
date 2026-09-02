@@ -33,6 +33,20 @@ size that reads right depends on the footage style, not just on "bigger = more
 readable" -- don't assume one channel's validated size transfers to another without
 checking in context. See main-edit's SKILL.md for that channel's separate default.
 
+**Check for text overflowing its OWN card/badge canvas, not just face overlap.** The
+safe-zone composite check (below) verifies text doesn't sit over the speaker -- it says
+nothing about whether the text itself clips against the card/badge's own edges. Confirmed
+on the WhatYouStopEating video (2026-09): at the 4x scripture default (`--label-size 276`),
+longer references like "PROVERBS 23:31-32 (WEB)" had their trailing "(WEB)" clipped off
+the right edge of a 2560px-wide card, while a short one ("GENESIS 9:3 (WEB)") happened to
+fit -- so a single visual spot-check on one reference isn't enough. Separately, the
+"EAT BIBLICALLY" badge text measured ~934px wide against `gen_overlay.py badge`'s default
+900px canvas at `BADGE_FONT_SIZE=116` -- wider than its own canvas, overflowing both edges
+-- while shorter badges ("FAST WEEKLY", "WALK DAILY") looked fine. Before finalizing sizes,
+measure actual rendered width via `PIL.ImageDraw.textlength` against the card/badge width
+for the *longest* label/badge text in that specific video (not a representative one), and
+treat clipping as a hard stop the same as a face-overlap failure.
+
 **Never judge a candidate font size from an isolated, cropped card PNG** -- shown alone
 with nothing else in frame, text reads as far larger than it will once placed in the
 actual 4K video. This caused real back-and-forth confusion when picking main-edit's

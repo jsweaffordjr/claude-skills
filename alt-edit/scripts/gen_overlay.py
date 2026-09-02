@@ -54,6 +54,30 @@ BADGE_LABEL_SIZE = 100  # gold label line on a two-tier badge card
 BADGE_BODY_SIZE = 100   # wrapped white body line(s) on a two-tier badge card
 
 
+def fit_font_size(draw, text, font_path, start_size, max_width, min_size=60, step=4):
+    """Shrink font_size (from start_size down to min_size) until text fits max_width.
+    Guards against silent clipping -- confirmed on WhatYouStopEating (2026-09): the
+    scripture label ("PROVERBS 23:31-32 (WEB)") and the "EAT BIBLICALLY" badge both
+    overflowed their own canvas at the then-current sizes, and neither the label line
+    nor the single-line badge had any width check (only wrapped body text did). Returns
+    (size, font). Prints a note when it actually had to shrink below start_size, so
+    it's visible in the generation log rather than only caught by eye later."""
+    size = start_size
+    font = ImageFont.truetype(font_path, size)
+    if draw.textlength(text, font=font) <= max_width:
+        return size, font
+    while size > min_size:
+        size -= step
+        font = ImageFont.truetype(font_path, size)
+        if draw.textlength(text, font=font) <= max_width:
+            print(f"  [fit_font_size] shrank {start_size}->{size} to fit {text[:40]!r} "
+                  f"within {max_width}px (was overflowing)")
+            return size, font
+    print(f"  [fit_font_size] WARNING: {text[:40]!r} still overflows {max_width}px "
+          f"even at floor size {min_size} -- consider shortening the text")
+    return min_size, font
+
+
 def wrap_text(draw, text, font, max_width):
     words = text.split()
     lines, cur = [], ""
@@ -83,11 +107,15 @@ def make_label_body_card(out_path, label, body_text, width, label_font_size,
     """Shared renderer: bold gold label line + wrapped body text below. Used for both
     scripture cards (serif italic body) and long-form badges (sans bold body)."""
     pad_x = 70
-    label_font = ImageFont.truetype(SANS_BOLD, label_font_size)
     body_font_obj = ImageFont.truetype(body_font, body_font_size)
 
     scratch = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
     max_w = width - pad_x * 2
+    # Label is one line, never wrapped -- auto-shrink it if it would otherwise clip off
+    # the card edge (e.g. a long reference like "PROVERBS 23:31-32 (WEB)"). See
+    # fit_font_size's docstring for why this check exists.
+    label_font_size, label_font = fit_font_size(scratch, label.upper(), SANS_BOLD,
+                                                 label_font_size, max_w)
     lines = wrap_text(scratch, body_text, body_font_obj, max_w) if body_text else []
 
     line_h = int(body_font_size * 1.29)
@@ -200,14 +228,23 @@ def make_badge_card(out_path, label, body_text, width=1400, label_size=None, bod
                                  radius=24, accent_width=12)
 
 
+BADGE_PAD_X = 50  # minimum breathing room on each side of single-line badge text
+
+
 def make_badge(out_path, text, width=900, font_size=None):
     """Short single-line pill -- use only when text is genuinely 2-3 words."""
-    font_size = font_size or BADGE_FONT_SIZE
-    height = int(font_size * 2.05)
+    requested_size = font_size or BADGE_FONT_SIZE
+    height = int(requested_size * 2.05)  # box height stays put even if text auto-shrinks,
+                                          # so a run of badges (FAST WEEKLY/EAT BIBLICALLY/
+                                          # WALK DAILY) stays the same height as a set.
     canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     canvas.alpha_composite(rounded_bar((width, height), radius=24, accent_width=12))
     d = ImageDraw.Draw(canvas)
-    font = ImageFont.truetype(SANS_BOLD, font_size)
+    # Confirmed on WhatYouStopEating (2026-09): "EAT BIBLICALLY" at the then-default
+    # size measured wider than the 900px canvas itself (negative margin, both edges
+    # cut off) while shorter badges looked fine -- this was never checked before.
+    font_size, font = fit_font_size(d, text, SANS_BOLD, requested_size,
+                                     width - BADGE_PAD_X * 2)
     tw = d.textlength(text, font=font)
     d.text(((width - tw) / 2, (height - font_size) / 2 - 10), text, font=font, fill=WHITE)
     canvas.save(out_path)
