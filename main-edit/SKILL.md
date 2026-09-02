@@ -98,6 +98,12 @@ $FFMPEG -y -i raw.mp4 -vn -c:a copy raw-audio.m4a
 ```
 python3 ~/.claude/skills/alt-edit/scripts/transcribe.py raw-audio.m4a transcript.txt
 ```
+**Write `transcript.txt` into the same folder as the raw source video, not a scratch/
+working directory (confirmed with Jerry, 2026-08).** Unlike the other intermediates
+(audio extract, PNG/mov assets), the transcript is a keeper on this channel going
+forward -- don't lump it in with step 8's "clean up intermediates?" question, and
+don't delete it during cleanup even if Jerry says yes to the rest.
+
 Show Jerry the transcript and ask him to flag mis-transcribed names/terms before
 treating it as ground truth (same reasoning as alt-edit -- Whisper garbles proper nouns).
 
@@ -196,7 +202,8 @@ mega-chain," for the mechanism and the per-segment check to run before concatena
 Report the output path and a short summary of what's included. **Include the NKJV
 credit line from above** for Jerry to paste into the video description. Ask about
 output filename and whether to clean up intermediate files -- don't delete anything
-without asking.
+without asking. **The transcript is excluded from that cleanup question** -- it
+already lives in the raw video's folder per step 2 and stays there.
 
 ## Reference files
 Reuses alt-edit's reference docs rather than duplicating them:
