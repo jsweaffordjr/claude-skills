@@ -41,6 +41,14 @@ GOLD = (212, 175, 100, 255)
 WHITE = (255, 255, 255, 255)
 BAR_BG = (10, 10, 12, 200)  # semi-transparent near-black
 
+# Added for WhatIsFasting (2026-09): the fast-type badges need a "reveal" moment (not
+# a fast -> red, real fast -> green) on top of the standard gold "named" state. Same
+# bar/layout grammar, just a different accent-stripe/label color -- body text stays
+# WHITE in all cases for readability.
+RED = (214, 90, 90, 255)
+GREEN = (120, 178, 108, 255)
+ACCENT_COLORS = {"gold": GOLD, "red": RED, "green": GREEN}
+
 # Sizing history (2026-08): original -> 3x (still too small, badges 2x was fine) -> 2x on
 # top of that (4x original) after the FastingMistakes video. Badges stay at 2x original --
 # only scripture kept needing to grow. If a video's actual footage can't safely fit this,
@@ -94,18 +102,20 @@ def wrap_text(draw, text, font, max_width):
     return lines
 
 
-def rounded_bar(size, radius=30, accent_width=14):
+def rounded_bar(size, radius=30, accent_width=14, accent_color=GOLD):
     img = Image.new("RGBA", size, (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     d.rounded_rectangle([0, 0, size[0] - 1, size[1] - 1], radius=radius, fill=BAR_BG)
-    d.rounded_rectangle([0, 0, accent_width, size[1] - 1], radius=radius // 2, fill=GOLD)
+    d.rounded_rectangle([0, 0, accent_width, size[1] - 1], radius=radius // 2, fill=accent_color)
     return img
 
 
 def make_label_body_card(out_path, label, body_text, width, label_font_size,
-                          body_font_size, body_font, radius=30, accent_width=14):
-    """Shared renderer: bold gold label line + wrapped body text below. Used for both
-    scripture cards (serif italic body) and long-form badges (sans bold body)."""
+                          body_font_size, body_font, radius=30, accent_width=14,
+                          accent_color=GOLD):
+    """Shared renderer: bold label line (accent_color, GOLD by default) + wrapped body
+    text below (always WHITE). Used for scripture cards (serif italic body), long-form
+    badges (sans bold body), and the red/green reveal variants (see ACCENT_COLORS)."""
     pad_x = 70
     body_font_obj = ImageFont.truetype(body_font, body_font_size)
 
@@ -124,10 +134,11 @@ def make_label_body_card(out_path, label, body_text, width, label_font_size,
     height = label_h + len(lines) * line_h + bottom_pad if lines else label_h + bottom_pad
 
     canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    canvas.alpha_composite(rounded_bar((width, height), radius=radius, accent_width=accent_width))
+    canvas.alpha_composite(rounded_bar((width, height), radius=radius, accent_width=accent_width,
+                                        accent_color=accent_color))
     d = ImageDraw.Draw(canvas)
 
-    d.text((pad_x, 34), label.upper(), font=label_font, fill=GOLD)
+    d.text((pad_x, 34), label.upper(), font=label_font, fill=accent_color)
     for i, line in enumerate(lines):
         d.text((pad_x, label_h + i * line_h), line, font=body_font_obj, fill=WHITE)
 
@@ -141,10 +152,11 @@ def make_label_body_card(out_path, label, body_text, width, label_font_size,
 
 
 def make_scripture_card(out_path, reference, verse_text, width=2560,
-                         label_size=None, body_size=None):
+                         label_size=None, body_size=None, accent_color=GOLD):
     return make_label_body_card(out_path, reference, verse_text, width,
                                  label_size or REF_FONT_SIZE,
-                                 body_size or VERSE_FONT_SIZE, SERIF_IT)
+                                 body_size or VERSE_FONT_SIZE, SERIF_IT,
+                                 accent_color=accent_color)
 
 
 def estimate_height(body_text, width, label_font_size, body_font_size, body_font, pad_x=70):
@@ -220,25 +232,30 @@ def auto_chunk(full_text, width, label_font_size, body_font_size, body_font, max
     return chunks
 
 
-def make_badge_card(out_path, label, body_text, width=1400, label_size=None, body_size=None):
-    """Two-tier badge: gold label (e.g. 'MISTAKE 1') + wrapped white description."""
+def make_badge_card(out_path, label, body_text, width=1400, label_size=None, body_size=None,
+                     accent_color=GOLD):
+    """Two-tier badge: label (accent_color, e.g. 'MISTAKE 1') + wrapped white description."""
     return make_label_body_card(out_path, label, body_text, width,
                                  label_size or BADGE_LABEL_SIZE,
                                  body_size or BADGE_BODY_SIZE, SANS_BOLD,
-                                 radius=24, accent_width=12)
+                                 radius=24, accent_width=12, accent_color=accent_color)
 
 
 BADGE_PAD_X = 50  # minimum breathing room on each side of single-line badge text
 
 
-def make_badge(out_path, text, width=900, font_size=None):
-    """Short single-line pill -- use only when text is genuinely 2-3 words."""
+def make_badge(out_path, text, width=900, font_size=None, accent_color=GOLD):
+    """Short single-line pill -- use only when text is genuinely 2-3 words. Text stays
+    WHITE regardless of accent_color (matches the established gold-badge look, don't
+    change it as a side effect of adding color variants) -- accent_color only retints
+    the left stripe, same as the two-tier card's body text/label split."""
     requested_size = font_size or BADGE_FONT_SIZE
     height = int(requested_size * 2.05)  # box height stays put even if text auto-shrinks,
                                           # so a run of badges (FAST WEEKLY/EAT BIBLICALLY/
                                           # WALK DAILY) stays the same height as a set.
     canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    canvas.alpha_composite(rounded_bar((width, height), radius=24, accent_width=12))
+    canvas.alpha_composite(rounded_bar((width, height), radius=24, accent_width=12,
+                                        accent_color=accent_color))
     d = ImageDraw.Draw(canvas)
     # Confirmed on WhatYouStopEating (2026-09): "EAT BIBLICALLY" at the then-default
     # size measured wider than the 900px canvas itself (negative margin, both edges
@@ -265,6 +282,8 @@ def main():
                               help="override REF_FONT_SIZE for unusually tight footage")
     p_scripture.add_argument("--body-size", type=int, default=None,
                               help="override VERSE_FONT_SIZE for unusually tight footage")
+    p_scripture.add_argument("--color", choices=list(ACCENT_COLORS), default="gold",
+                              help="accent stripe/label color (default gold)")
 
     p_auto = sub.add_parser("scripture-auto",
                              help="split a long passage into as many card-sized chunks as needed")
@@ -275,6 +294,8 @@ def main():
     p_auto.add_argument("--max-height", type=int, default=1300)
     p_auto.add_argument("--label-size", type=int, default=None)
     p_auto.add_argument("--body-size", type=int, default=None)
+    p_auto.add_argument("--color", choices=list(ACCENT_COLORS), default="gold",
+                         help="accent stripe/label color (default gold)")
 
     p_badge = sub.add_parser("badge")
     p_badge.add_argument("text", help="short pill text, or the label if --body is given")
@@ -285,6 +306,10 @@ def main():
                           help="override BADGE_LABEL_SIZE for unusually tight footage")
     p_badge.add_argument("--body-size", type=int, default=None,
                           help="override BADGE_BODY_SIZE (two-tier) or BADGE_FONT_SIZE (single-line)")
+    p_badge.add_argument("--color", choices=list(ACCENT_COLORS), default="gold",
+                          help="accent stripe color (default gold); also retints the label "
+                               "line for a two-tier (--body) card -- single-line pill text "
+                               "stays WHITE regardless, only its stripe retints")
 
     args = p.parse_args()
     out_ref = args.output_prefix if args.cmd == "scripture-auto" else args.output
@@ -292,7 +317,7 @@ def main():
 
     if args.cmd == "scripture":
         make_scripture_card(args.output, args.reference, args.verse_text, args.width,
-                             args.label_size, args.body_size)
+                             args.label_size, args.body_size, ACCENT_COLORS[args.color])
     elif args.cmd == "scripture-auto":
         label_size = args.label_size or REF_FONT_SIZE
         body_size = args.body_size or VERSE_FONT_SIZE
@@ -302,15 +327,16 @@ def main():
         for i, chunk in enumerate(chunks, 1):
             out_path = f"{args.output_prefix}_{i}.png"
             make_scripture_card(out_path, args.reference, chunk, args.width,
-                                 args.label_size, args.body_size)
+                                 args.label_size, args.body_size, ACCENT_COLORS[args.color])
             words = len(chunk.split())
             print(f"  [{i}] ~{words} words: {chunk[:70]}{'...' if len(chunk) > 70 else ''}")
     elif args.cmd == "badge":
         if args.body:
             make_badge_card(args.output, args.text, args.body, args.width or 1400,
-                             args.label_size, args.body_size)
+                             args.label_size, args.body_size, ACCENT_COLORS[args.color])
         else:
-            make_badge(args.output, args.text, args.width or 900, args.body_size)
+            make_badge(args.output, args.text, args.width or 900, args.body_size,
+                       ACCENT_COLORS[args.color])
 
 
 if __name__ == "__main__":
